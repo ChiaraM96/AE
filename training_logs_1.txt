@@ -1,0 +1,38 @@
+Model Specifications:
+Encoder: 4 layers (232 neurons)
+Decoder: 5 layers (235 neurons)
+input_dim: 3
+neurons: 8
+dropout_factor: 0.1
+attention: True
+batch_size: 32
+learning_rate: 0.0005
+epochs: 25
+attention_heads: 4
+by_segment: True
+Epoch Logs:
+Epoch 1/25 | Loss: -0.8402 | Variable loss: ['0.8861', '0.8729', '0.7616'] | Time: 16.14s | ETA: 388.65s
+Epoch 2/25 | Loss: -0.9342 | Variable loss: ['0.9432', '0.9388', '0.9206'] | Time: 15.20s | ETA: 361.50s
+Epoch 3/25 | Loss: -0.9449 | Variable loss: ['0.9500', '0.9482', '0.9365'] | Time: 14.98s | ETA: 340.66s
+Epoch 4/25 | Loss: -0.9503 | Variable loss: ['0.9537', '0.9524', '0.9449'] | Time: 15.17s | ETA: 323.76s
+Epoch 5/25 | Loss: -0.9548 | Variable loss: ['0.9572', '0.9561', '0.9510'] | Time: 15.15s | ETA: 307.43s
+Epoch 6/25 | Loss: -0.9576 | Variable loss: ['0.9591', '0.9587', '0.9550'] | Time: 14.95s | ETA: 290.84s
+Epoch 7/25 | Loss: -0.9597 | Variable loss: ['0.9606', '0.9601', '0.9585'] | Time: 20.16s | ETA: 288.14s
+Epoch 8/25 | Loss: -0.9618 | Variable loss: ['0.9619', '0.9615', '0.9619'] | Time: 22.94s | ETA: 287.02s
+Epoch 9/25 | Loss: -0.9634 | Variable loss: ['0.9631', '0.9635', '0.9636'] | Time: 19.55s | ETA: 274.96s
+Epoch 10/25 | Loss: -0.9641 | Variable loss: ['0.9638', '0.9642', '0.9641'] | Time: 18.50s | ETA: 259.81s
+Epoch 11/25 | Loss: -0.9643 | Variable loss: ['0.9643', '0.9646', '0.9641'] | Time: 20.08s | ETA: 246.06s
+Epoch 12/25 | Loss: -0.9651 | Variable loss: ['0.9649', '0.9652', '0.9652'] | Time: 21.19s | ETA: 232.45s
+Epoch 13/25 | Loss: -0.9658 | Variable loss: ['0.9653', '0.9658', '0.9664'] | Time: 21.01s | ETA: 217.50s
+Epoch 14/25 | Loss: -0.9664 | Variable loss: ['0.9656', '0.9671', '0.9667'] | Time: 16.14s | ETA: 197.85s
+Epoch 15/25 | Loss: -0.9670 | Variable loss: ['0.9656', '0.9678', '0.9677'] | Time: 17.68s | ETA: 179.69s
+Epoch 16/25 | Loss: -0.9679 | Variable loss: ['0.9664', '0.9683', '0.9689'] | Time: 16.21s | ETA: 160.75s
+Epoch 17/25 | Loss: -0.9679 | Variable loss: ['0.9670', '0.9684', '0.9683'] | Time: 19.30s | ETA: 143.59s
+Epoch 18/25 | Loss: -0.9682 | Variable loss: ['0.9675', '0.9686', '0.9685'] | Time: 16.74s | ETA: 125.19s
+Epoch 19/25 | Loss: -0.9695 | Variable loss: ['0.9683', '0.9696', '0.9706'] | Time: 15.80s | ETA: 106.66s
+Epoch 20/25 | Loss: -0.9694 | Variable loss: ['0.9684', '0.9698', '0.9701'] | Time: 15.35s | ETA: 88.29s
+Epoch 21/25 | Loss: -0.9697 | Variable loss: ['0.9690', '0.9706', '0.9695'] | Time: 17.93s | ETA: 70.69s
+Epoch 22/25 | Loss: -0.9704 | Variable loss: ['0.9695', '0.9708', '0.9710'] | Time: 18.19s | ETA: 53.10s
+Epoch 23/25 | Loss: -0.9706 | Variable loss: ['0.9698', '0.9706', '0.9713'] | Time: 18.12s | ETA: 35.44s
+Epoch 24/25 | Loss: -0.9708 | Variable loss: ['0.9702', '0.9713', '0.9708'] | Time: 19.94s | ETA: 17.81s
+Epoch 25/25 | Loss: -0.9716 | Variable loss: ['0.9710', '0.9720', '0.9718'] | Time: 20.52s | ETA: 0.00s
