@@ -7,6 +7,9 @@ import os
 import json
 import h5py
 from scipy.stats import zscore
+import pdb
+
+## USE PYTHON 3.10 TO BUILD THE POINTPROCESS LIBRARY!!! 
 
 class PointProcessModule:
     def __init__(self, path_to_lib):
@@ -120,11 +123,12 @@ class FilesModule:
 
     def importMatlab(self, id_temp):
         data = {}
-        file_path = os.path.join(self.matlabPath, id_temp + '_ann.mat')
+        file_path = os.path.join(self.matlabPath, id_temp + '_Annotations.mat')
         print(file_path)
         if not os.path.exists(file_path):
-            print('File not found')
+            print('File not found!')
             return None, None, None
+            
         with h5py.File(file_path, 'r') as f:
             data = {}
             for key in f['data'].keys():
@@ -137,9 +141,7 @@ class FilesModule:
                         sub_obj = obj[key_temp]
                         if isinstance(sub_obj, h5py.Dataset):
                             data[key][key_temp] = sub_obj[:]
-                        # elif isinstance(sub_obj, h5py.Group):
-                        #     # You could go deeper if needed
-                        #     data[key][key_temp] = "Nested group (not loaded)"
+
         keys = []
         annotation_keys = []
         for key in data.keys():
@@ -154,43 +156,207 @@ class FilesModule:
 
         if 'annotations' in keys:
             keys.remove('annotations')
-        df_data = pd.DataFrame(columns=keys)
 
+        # FIXED: Handle multi-dimensional arrays properly
+        data_dict = {}  # Dictionary to collect all column data
+        
         for key in keys:
-            df_data[key] = pd.DataFrame(data[key])
+            try:
+                # print(f"Processing key: {key}")
+                # if hasattr(data[key], 'shape'):
+                    # print(f"Data shape for {key}: {data[key].shape}")
+                
+                if isinstance(data[key], np.ndarray):
+                    if data[key].ndim == 0:
+                        # 0D array (scalar) - skip or convert to single-element array
+                        # print(f"Warning: {key} is a scalar, skipping...")
+                        continue
+                        
+                    elif data[key].ndim == 1:
+                        # 1D array - use as single column
+                        if len(data[key]) > 0:  # Only include non-empty arrays
+                            data_dict[key] = data[key]
+                        else:
+                            # print(f"Warning: {key} is empty, skipping...")
+                            continue
+                            
+                    elif data[key].ndim == 2:
+                        # 2D array - split into separate columns
+                        if data[key].shape[0] == 0:  # Skip empty arrays
+                            # print(f"Warning: {key} is empty, skipping...")
+                            continue
+                            
+                        if data[key].shape[1] == 3:
+                            # For 3D data (like accelerometer X, Y, Z)
+                            if 'ACCEL' in key:
+                                data_dict[f"{key}_X"] = data[key][:, 0]
+                                data_dict[f"{key}_Y"] = data[key][:, 1] 
+                                data_dict[f"{key}_Z"] = data[key][:, 2]
+                            else:
+                                # For other 3-column data
+                                data_dict[f"{key}_col1"] = data[key][:, 0]
+                                data_dict[f"{key}_col2"] = data[key][:, 1]
+                                data_dict[f"{key}_col3"] = data[key][:, 2]
+                        
+                        elif data[key].shape[1] == 1:
+                            # Single column 2D array - flatten to 1D
+                            data_dict[key] = data[key][:, 0]
+                        
+                        else:
+                            # Multiple columns - create separate columns for each
+                            for col_idx in range(data[key].shape[1]):
+                                data_dict[f"{key}_col{col_idx}"] = data[key][:, col_idx]
+                    
+                    else:
+                        # Higher dimensional - flatten (fallback)
+                        # print(f"Warning: {key} has {data[key].ndim} dimensions, flattening...")
+                        flattened = data[key].flatten()
+                        if len(flattened) > 0:
+                            data_dict[key] = flattened
+                        else:
+                            # print(f"Warning: {key} flattened to empty array, skipping...")
+                            continue
+                else:
+                    # Non-numpy data - convert to numpy array
+                    try:
+                        arr = np.array(data[key])
+                        if arr.size > 0 and arr.ndim > 0:  # Only include non-empty, non-scalar arrays
+                            data_dict[key] = arr.flatten() if arr.ndim > 1 else arr
+                        else:
+                            # print(f"Warning: {key} converted to empty/scalar array, skipping...")
+                            continue
+                    except:
+                        # print(f"Warning: Could not convert {key} to numpy array, skipping...")
+                        continue
+                        
+            except Exception as e:
+                print(f"Error processing key {key}: {e}")
+                continue
 
+        # Check if we have any data
+        if not data_dict:
+            # print("Warning: No valid data columns found!")
+            return pd.DataFrame(), {}, 1000
+
+        # Create DataFrame from the processed data dictionary
+        # print(f"Creating DataFrame with {len(data_dict)} columns")
+        
+        # FIXED: Check array lengths more robustly
+        def get_length(arr):
+            """Get length of array, handling scalars and different types"""
+            if hasattr(arr, '__len__'):
+                return len(arr)
+            elif hasattr(arr, 'size'):
+                return arr.size if arr.ndim > 0 else 0  # Return 0 for scalars
+            else:
+                return 0  # For other types
+        
+        lengths = {k: get_length(v) for k, v in data_dict.items()}
+        
+        # Remove any columns with length 0
+        data_dict = {k: v for k, v in data_dict.items() if lengths[k] > 0}
+        lengths = {k: v for k, v in lengths.items() if v > 0}
+        
+        if not data_dict:
+            # print("Warning: No valid data columns after filtering!")
+            return pd.DataFrame(), {}, 1000
+        
+        unique_lengths = set(lengths.values())
+        
+        if len(unique_lengths) > 1:
+            # print("Warning: Arrays have different lengths:")
+            for k, length in lengths.items():
+                print(f"  {k}: {length}")
+            
+            # Find the most common length
+            from collections import Counter
+            length_counts = Counter(lengths.values())
+            target_length = length_counts.most_common(1)[0][0]
+            # print(f"Using target length: {target_length}")
+            
+            # Trim or pad arrays to match target length
+            for k, v in data_dict.items():
+                current_length = lengths[k]
+                if current_length != target_length:
+                    if current_length > target_length:
+                        data_dict[k] = v[:target_length]  # Trim
+                        # print(f"Trimmed {k} from {current_length} to {target_length}")
+                    else:
+                        # Pad with last value or zeros
+                        if current_length > 0:
+                            pad_value = v[-1] if hasattr(v, '__getitem__') else 0
+                        else:
+                            pad_value = 0
+                        padding = np.full(target_length - current_length, pad_value)
+                        data_dict[k] = np.concatenate([v, padding])
+                        # print(f"Padded {k} from {current_length} to {target_length}")
+
+        try:
+            df_data = pd.DataFrame(data_dict)
+        except Exception as e:
+            print(f"Error creating DataFrame: {e}")
+            # Debug: print problematic data
+            # for k, v in data_dict.items():
+                # print(f"  {k}: type={type(v)}, shape={getattr(v, 'shape', 'N/A')}")
+            return pd.DataFrame(), {}, 1000
+
+        # Process annotations (same as before)
         df_annotations = {}
         for key in annotation_keys:
-            df_annotations[key] = pd.DataFrame(data['annotations'][key].astype(int))
-            if key == 'ecg':
-                df_annotations[key].columns = ['R', 'P', 'Q', 'S', 'T']
-            elif key == 'ppg':
-                df_annotations[key].columns = ['Sys', 'Notch', 'Dia']
-            elif key == 'resp':
-                df_annotations[key].columns = ['Valley', 'Peak']
+            try:
+                df_annotations[key] = pd.DataFrame(data['annotations'][key].astype(int))
+                if key == 'ecg':
+                    df_annotations[key].columns = ['R', 'P', 'Q', 'S', 'T']
+                elif key == 'ppg':
+                    df_annotations[key].columns = ['Sys', 'Notch', 'Dia']
+                elif key == 'resp':
+                    df_annotations[key].columns = ['Valley', 'Peak']
+            except Exception as e:
+                print(f"Error processing annotation key {key}: {e}")
+                continue
 
-        fs = data['Fs'][0].astype(int)
+        try:
+            fs = data['Fs'][0].astype(int)
+        except:
+            fs = 256
+            print("Warning: Could not extract sampling frequency, using default " + str(fs) + " Hz")
+        
+        print(f"Final DataFrame shape: {df_data.shape}")
+        print(f"DataFrame columns: {list(df_data.columns)}")
+        
         return df_data, df_annotations, fs
 
     def getRR(self, df_annotations, fs):
         r = df_annotations['ecg']['R'] / fs
         rr = np.diff(r)
-        mean = np.mean(rr)
-        std = np.std(rr)
-        z_diff = zscore(rr)
         threshold = 3
-        outliers = np.array(np.where(z_diff > threshold))
-        z_diff[outliers] = 3
-        rr = z_diff * std + mean
+        for i in range(3):
+            mean = np.mean(rr)
+            std = np.std(rr)
+            z_diff = zscore(rr)
+            outliers = np.array(np.where(z_diff > threshold))
+            z_diff[outliers] = 3
+            rr = z_diff * std + mean
         rr_new = np.cumsum(rr)
         return rr_new
 
-    def createTable(self, id_temp, datasetPath):
+    def importDataset(self, datasetPath, id_temp):
         print(f'LOADING ID {id_temp}')
         data, df_annotations, fs = self.importMatlab(id_temp)
-        d = json.load(open(os.path.join(datasetPath, 'json', id_temp + '.json')))
+        if os.path.exists(os.path.join(datasetPath, 'json', id_temp + '.json')):
+            d = json.load(open(os.path.join(datasetPath, 'json', id_temp + '.json')))
+        elif os.path.exists(os.path.join(datasetPath, 'parquet', id_temp + '.parquet')):
+            d = pd.read_parquet(os.path.join(datasetPath, 'parquet', id_temp + '.parquet'), engine="pyarrow")
         d = {key: np.array(value) if isinstance(value, list)
              else value for key, value in d.items()}
+        return d, df_annotations, fs, data
+        
+    def createTable(self, d, df_annotations, data, fs, id_temp, datasetPath = ""):
+
+        if datasetPath and any([d, df_annotations, data, fs] is None):
+            d, df_annotations, fs, data = self.importDataset(datasetPath, id_temp)
+        
+            
         pp_time = np.array(d['Time']).flatten()
         fs_pp = int(1 / np.mean(np.diff(pp_time)))
         pp_time = pd.to_datetime(pp_time, unit='s')
@@ -198,15 +364,15 @@ class FilesModule:
         hf = np.array(d['powHF']).flatten()
         lfhf = lf / hf
         rr = self.getRR(df_annotations, fs)
-        gsr = data['gsr']
-        resp = data['resp_edr']
-        time = pd.to_datetime(range(len(gsr)) / fs, unit='s')
+        # gsr = data['gsr']
+        # resp = data['resp_edr']
+        time = pd.to_datetime(np.arange(data.shape[0]) / fs, unit='s')
         hr = np.diff(rr)
         r = pd.to_datetime(rr[1:], unit='s')
         hr = 60 * np.ones(pp_time.shape) / np.interp(pp_time, r, hr)
-        gsr = np.interp(pp_time, time, gsr)
-        resp = np.interp(pp_time, time, resp)
-        time_since_start = range(len(gsr)) / np.array(fs_pp)
+        # gsr = np.interp(pp_time, time, gsr)
+        # resp = np.interp(pp_time, time, resp)
+        time_since_start = range(len(pp_time)) / np.array(fs_pp)
 
         cols = ["ID",
                 "Recording start",
@@ -215,14 +381,19 @@ class FilesModule:
                 "Heart Rate (bpm)",
                 "Sympathovagal Balance (a.u.)",
                 "Respiration (a.u.)"]
-
+        
         df = pd.DataFrame(columns=cols)
+
+        for var, varName in zip(['gsr', 'resp_edr'], [cols[3], cols[6]]):
+            if var in data.columns:
+                varTemp = data[var]
+                varTemp = np.interp(pp_time, time, varTemp)
+                df[varName] = varTemp
+            
         df['Time since start (s)'] = time_since_start
-        df['Skin Conductance (microS)'] = gsr
         df['Heart Rate (bpm)'] = hr
         df['Sympathovagal Balance (a.u.)'] = lfhf
         df["Recording start"] = pp_time[0]
-        df['Respiration (a.u.)'] = resp
         df['ID'] = id_temp
         
         return df
